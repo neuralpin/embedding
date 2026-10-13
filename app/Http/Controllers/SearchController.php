@@ -3,56 +3,36 @@
 namespace App\Http\Controllers;
 
 use App\Models\ContentChunk;
-use App\Models\ContentEntry;
+use App\Services\HybridChunkSearch;
 use App\Services\OllamaClient;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class SearchController extends Controller
 {
-    public function entries(Request $request): JsonResponse
-    {
-        $query = trim($request->string('q')->toString());
-        $terms = collect(preg_split('/\s+/', Str::lower(Str::ascii($query))) ?: [])
-            ->filter()
-            ->unique()
-            ->values();
-        $entries = ContentEntry::query()
-            ->when($terms->isNotEmpty(), fn ($builder) => $this->matchEntryTerms($builder, $terms->all()))
-            ->select(['id', 'title', 'created_at'])
-            ->latest('created_at')
-            ->orderByDesc('id')
-            ->paginate(8);
-
-        return response()->json(['entries' => $entries]);
-    }
-
-    /** @param array<int, string> $terms */
-    private function matchEntryTerms(Builder $builder, array $terms): void
-    {
-        foreach ($terms as $term) {
-            if (DB::connection()->getDriverName() === 'pgsql') {
-                $builder->whereRaw(
-                    "translate(lower(title || ' ' || body), 'áéíóúüñ', 'aeiouun') like ?",
-                    ["%{$term}%"],
-                );
-
-                continue;
-            }
-
-            $builder->whereRaw("lower(title || ' ' || body) like ?", ["%{$term}%"]);
-        }
-    }
-
-    public function chunks(Request $request, OllamaClient $ollama): JsonResponse
+    public function chunks(Request $request, OllamaClient $ollama, HybridChunkSearch $hybridSearch): JsonResponse
     {
         $validated = $request->validate(['q' => ['required', 'string', 'max:500']]);
+        $chunks = $hybridSearch->search($validated['q'], $ollama->embed($validated['q']));
+        $entries = $chunks
+            ->groupBy('content_entry_id')
+            ->map(function (Collection $entryChunks): array {
+                /** @var ContentChunk $bestChunk */
+                $bestChunk = $entryChunks->first();
 
-        return response()->json(['chunks' => $this->semanticChunks($ollama->embed($validated['q']))]);
+                return [
+                    'id' => $bestChunk->contentEntry->id,
+                    'title' => $bestChunk->contentEntry->title,
+                    'created_at' => $bestChunk->contentEntry->created_at,
+                    'relevance' => max($entryChunks->pluck('hybrid_score')->map(static fn (mixed $score): float => (float) $score)->all()),
+                    'matched_chunks' => $entryChunks->count(),
+                ];
+            })
+            ->sortByDesc('relevance')
+            ->values();
+
+        return response()->json(['chunks' => $chunks, 'entries' => $entries]);
     }
 
     public function rag(Request $request, OllamaClient $ollama): JsonResponse
@@ -76,21 +56,5 @@ class SearchController extends Controller
         return response()->json([
             'summary' => $ollama->summarize($validated['q'], $chunks->pluck('content')->implode("\n\n")),
         ]);
-    }
-
-    /** @param array<int, float> $embedding */
-    private function semanticChunks(array $embedding): Collection
-    {
-        $vector = json_encode($embedding, JSON_THROW_ON_ERROR);
-
-        return ContentChunk::query()
-            ->with('contentEntry:id,title')
-            ->when(DB::connection()->getDriverName() === 'pgsql', fn ($builder) => $builder
-                ->whereNotNull('embedding')
-                ->select('content_chunks.*')
-                ->selectRaw('1 - (embedding <=> ?::vector) as similarity', [$vector])
-                ->orderByDesc('similarity'))
-            ->limit(12)
-            ->get();
     }
 }

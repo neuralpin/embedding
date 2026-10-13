@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\ContentChunk;
-use App\Models\ContentEntry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -12,31 +11,9 @@ class SearchControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_entries_search_does_not_call_ollama(): void
+    public function test_hybrid_search_returns_chunks_and_their_grouped_entries(): void
     {
-        Http::preventStrayRequests();
-
-        $this->getJson(route('search.entries'))
-            ->assertOk()
-            ->assertJsonStructure(['entries' => ['data', 'current_page']]);
-
-        Http::assertNothingSent();
-    }
-
-    public function test_entries_search_matches_each_query_term(): void
-    {
-        $entry = ContentEntry::factory()->create(['title' => 'Indice glucemico para diabetes']);
-        ContentEntry::factory()->create(['title' => 'Índice nutricional']);
-
-        $this->getJson(route('search.entries', ['q' => 'indice glucemico']))
-            ->assertOk()
-            ->assertJsonPath('entries.total', 1)
-            ->assertJsonPath('entries.data.0.id', $entry->id);
-    }
-
-    public function test_chunks_search_only_calls_the_embedding_endpoint(): void
-    {
-        $chunk = ContentChunk::factory()->create();
+        $chunk = ContentChunk::factory()->create(['content' => 'La vitamina C participa en funciones antioxidantes.']);
         Http::preventStrayRequests();
         Http::fake([
             'http://127.0.0.1:11434/api/embed' => Http::response(['embeddings' => [array_fill(0, 256, 0.125)]]),
@@ -44,7 +21,9 @@ class SearchControllerTest extends TestCase
 
         $this->getJson(route('search.chunks', ['q' => 'vitamina']))
             ->assertOk()
-            ->assertJsonPath('chunks.0.id', $chunk->id);
+            ->assertJsonPath('chunks.0.id', $chunk->id)
+            ->assertJsonPath('entries.0.id', $chunk->contentEntry->id)
+            ->assertJsonPath('entries.0.matched_chunks', 1);
 
         Http::assertSentCount(1);
     }

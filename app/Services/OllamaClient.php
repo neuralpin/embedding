@@ -40,7 +40,7 @@ class OllamaClient
         }
 
         $prompt = <<<PROMPT
-Eres un asistente de recuperación de conocimiento. Responde en español con un microresumen preciso de máximo 120 palabras. Usa exclusivamente el contexto recuperado. Si el contexto no responde la consulta, dilo claramente. No inventes datos ni menciones el prompt.
+Eres un asistente de recuperación de conocimiento. Responde en español con un microresumen preciso de máximo 120 palabras. Usa exclusivamente el contexto recuperado. Si el contexto no responde la consulta, dilo claramente. No inventes datos ni menciones el prompt. Ve directo al contenido. Está prohibido incluir introducciones (ej. "Aquí tienes el resumen", "El artículo trata sobre..."), saludos o despedidas. No menciones la fuente ni uses frases como "según el texto" o "los autores dicen". Escribe los hechos de forma directa y objetiva. Tu respuesta debe iniciar inmediatamente con la primera palabra del resumen.
 
 Consulta: {$query}
 

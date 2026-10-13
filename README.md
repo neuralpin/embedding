@@ -1,58 +1,62 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Embedding
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Aplicación Laravel para guardar contenido en texto plano markdown y permitir consultarlo mediante búsqueda híbrida: similitud vectorial y búsqueda de texto completo en español. Con una breve respuesta autogenerada con RAG. Acepta archivos PDF para extraer el texto plano.
 
-## About Laravel
+Por defecto se usa el modelo **embeddinggemma:300m-qat-q4_0** para procesar el embedding, ajustando el tamaño de la representación vectorial a 256 dimensiones y el modelo **qwen3:0.6b** para generar respuesta con RAG.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Dependencias
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- PHP 8.3 o posterior y Composer.
+- Node.js y npm para compilar los recursos de Vite/Tailwind CSS.
+- PostgreSQL con la extensión `pgvector` (recomendado para la búsqueda híbrida). También es posible usar otro motor compatible, con búsqueda textual de respaldo.
+- Ollama, con los modelos configurados para embeddings y generación.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Las dependencias incluyen Laravel 13, `smalot/pdfparser`, Alpine.js, DOMPurify, Highlight.js y Marked. Consulta `composer.json` y `package.json` para el listado y las versiones bloqueadas.
 
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Puesta en marcha local
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+copy .env.example .env
+php artisan key:generate
+npm install
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Configura en `.env` la conexión a PostgreSQL, `QUEUE_CONNECTION=database` y las variables de Ollama:
 
-## Contributing
+```dotenv
+OLLAMA_URL=http://127.0.0.1:11434
+OLLAMA_EMBEDDING_MODEL=embeddinggemma:300m-qat-q4_0
+OLLAMA_GENERATION_MODEL=qwen3:0.6b
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Descarga los modelos y prepara la aplicación:
 
-## Code of Conduct
+```bash
+ollama pull embeddinggemma:300m-qat-q4_0
+ollama pull qwen3:0.6b
+php artisan migrate
+npm run build
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+En desarrollo, ejecuta la aplicación, Vite y el worker de cola:
 
-## Security Vulnerabilities
+```bash
+php artisan serve
+npm run dev
+php artisan queue:work
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Despliegue
 
-## License
+En producción, configura las variables de entorno —incluidas base de datos, cola y Ollama—, y asegúrate de que Ollama sea accesible desde los procesos PHP y del worker. El usuario de PostgreSQL debe poder habilitar `vector`, ya que la migración crea esa extensión e índices de búsqueda.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+composer install --no-dev --optimize-autoloader
+npm ci
+npm run build
+php artisan migrate --force
+php artisan optimize
+```
+
+Publica el directorio `public/` mediante el servidor web, concede permisos de escritura a `storage/` y `bootstrap/cache/`, y mantén un proceso supervisado para `php artisan queue:work` para procesar la extracción de PDF, fragmentación y generación de embeddings.

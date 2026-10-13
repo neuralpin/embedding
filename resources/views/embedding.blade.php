@@ -4,15 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Atlas · búsqueda semántica</title>
+    <title>EmbeddingLab · búsqueda semántica</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-[#0b1020] font-sans text-slate-100 antialiased">
     <main x-data="embeddingApp" class="mx-auto max-w-[1800px] p-5 lg:p-8">
         <header class="mb-7 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-                <p class="text-xs font-semibold tracking-[0.2em] text-cyan-400">ATLAS / RAG LAB</p>
-                {{-- <h1 class="mt-1 text-2xl font-bold tracking-tight">Explora tu conocimiento</h1> --}}
+                <h1 class="mt-1 text-2xl font-bold tracking-tight">Embedding Lab</h1>
             </div>
             <button @click="newEntry" class="rounded-xl bg-cyan-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-cyan-300">+ Añadir contenido</button>
         </header>
@@ -27,15 +26,14 @@
             <section class="min-h-[580px] rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-2xl shadow-slate-950/30">
                 <div class="mb-5 flex items-center justify-between"><h2 class="font-semibold">Índice de contenido</h2><span class="rounded-full bg-slate-800 px-2 py-1 text-xs text-slate-400" x-text="entries.total || 0"></span></div>
                 <div class="space-y-2">
-                    <template x-for="entry in entries.data" :key="entry.id"><button @click="openEntry(entry.id)" class="w-full rounded-xl border border-transparent bg-slate-800/60 p-3 text-left transition hover:border-cyan-500/60 hover:bg-slate-800"><p class="truncate font-medium" x-text="entry.title"></p><p class="mt-1 text-xs text-slate-500" x-text="entry.created_at ? new Date(entry.created_at).toLocaleDateString('es-MX') : 'Coincidencia semántica'"></p></button></template>
+                    <template x-for="entry in entries.data" :key="entry.id"><button @click="openEntry(entry.id)" class="w-full rounded-xl border border-transparent bg-slate-800/60 p-3 text-left transition hover:border-cyan-500/60 hover:bg-slate-800"><p class="truncate font-medium" x-text="entry.title"></p><p class="mt-1 text-xs text-slate-500" x-text="`${entry.matched_chunks} chunks · score ${Number(entry.relevance).toFixed(3)}`"></p></button></template>
                     <p x-show="!entries.data.length" class="py-12 text-center text-sm text-slate-500">No hay contenido que mostrar.</p>
                 </div>
-                <div x-show="entries.last_page > 1" class="mt-5 flex items-center justify-between text-sm"><button @click="loadPage(entries.current_page - 1)" :disabled="entries.current_page === 1" class="disabled:text-slate-700">← Anterior</button><span class="text-slate-500" x-text="`${entries.current_page} / ${entries.last_page}`"></span><button @click="loadPage(entries.current_page + 1)" :disabled="entries.current_page === entries.last_page" class="disabled:text-slate-700">Siguiente →</button></div>
             </section>
 
             <section class="min-h-[580px] rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-2xl shadow-slate-950/30">
-                <div class="mb-5 flex items-center justify-between"><h2 class="font-semibold">Chunks recuperados</h2><span class="text-xs text-slate-500">vectorial</span></div>
-                <div class="space-y-3"><template x-for="chunk in chunks" :key="chunk.id"><article class="rounded-xl border border-slate-800 bg-slate-950/40 p-4"><p class="mb-2 text-xs font-medium text-cyan-400" x-text="chunk.content_entry?.title"></p><p class="line-clamp-4 text-sm leading-6 text-slate-300" x-text="chunk.content"></p><p x-show="chunk.similarity" class="mt-3 text-xs text-slate-500" x-text="`similitud ${Math.round(chunk.similarity * 100)}%`"></p></article></template><p x-show="!chunks.length" class="py-12 text-center text-sm text-slate-500">Los fragmentos relevantes aparecerán aquí.</p></div>
+                <div class="mb-5 flex items-center justify-between"><h2 class="font-semibold">Chunks recuperados</h2><span class="text-xs text-slate-500">híbrido + reranking</span></div>
+                <div class="space-y-3"><template x-for="chunk in chunks" :key="chunk.id"><article class="rounded-xl border border-slate-800 bg-slate-950/40 p-4"><p class="mb-2 text-xs font-medium text-cyan-400" x-text="chunk.content_entry?.title"></p><p class="line-clamp-4 text-sm leading-6 text-slate-300" x-text="chunk.content"></p><p x-show="chunk.hybrid_score" class="mt-3 text-xs text-slate-500" x-text="`score híbrido ${Number(chunk.hybrid_score).toFixed(3)}`"></p></article></template><p x-show="!chunks.length" class="py-12 text-center text-sm text-slate-500">Los fragmentos relevantes aparecerán aquí.</p></div>
             </section>
 
             <section class="min-h-[580px] rounded-2xl border border-cyan-900/70 bg-gradient-to-b from-slate-900 to-cyan-950/20 p-5 shadow-2xl shadow-slate-950/30">

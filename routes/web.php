@@ -8,7 +8,6 @@ Route::get('/', function () {
     return view('embedding');
 })->name('embedding.index');
 
-Route::get('/search/entries', [SearchController::class, 'entries'])->name('search.entries');
 Route::get('/search/chunks', [SearchController::class, 'chunks'])->name('search.chunks');
 Route::post('/search/rag', [SearchController::class, 'rag'])->name('search.rag');
 Route::post('/content', [ContentEntryController::class, 'store'])->name('content.store');
