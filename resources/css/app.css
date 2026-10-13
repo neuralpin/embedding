@@ -7,3 +7,14 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+[x-cloak] { display: none !important; }
+
+.markdown-preview h1 { @apply mb-3 text-2xl font-bold text-white; }
+.markdown-preview h2 { @apply mb-3 text-xl font-semibold text-white; }
+.markdown-preview p { @apply mb-3; }
+.markdown-preview ul { @apply mb-3 list-disc pl-5; }
+.markdown-preview ol { @apply mb-3 list-decimal pl-5; }
+.markdown-preview pre { @apply mb-3 overflow-x-auto rounded-lg bg-slate-950 p-3; }
+.markdown-preview code { @apply rounded bg-slate-800 px-1 font-mono text-cyan-200; }
+.markdown-preview pre code { @apply bg-transparent p-0; }
