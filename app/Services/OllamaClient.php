@@ -52,6 +52,7 @@ PROMPT;
             'model' => config('ollama.generation_model'),
             'prompt' => $prompt,
             'stream' => false,
+            'think' => false,
             'options' => ['temperature' => 0.2],
         ])->throw()->json('response'));
     }

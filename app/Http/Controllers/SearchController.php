@@ -5,26 +5,47 @@ namespace App\Http\Controllers;
 use App\Models\ContentChunk;
 use App\Models\ContentEntry;
 use App\Services\OllamaClient;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class SearchController extends Controller
 {
     public function entries(Request $request): JsonResponse
     {
         $query = trim($request->string('q')->toString());
+        $terms = collect(preg_split('/\s+/', Str::lower(Str::ascii($query))) ?: [])
+            ->filter()
+            ->unique()
+            ->values();
         $entries = ContentEntry::query()
-            ->when($query !== '', fn ($builder) => $builder->where(function ($queryBuilder) use ($query): void {
-                $queryBuilder->where('title', 'ilike', "%{$query}%")->orWhere('body', 'ilike', "%{$query}%");
-            }))
+            ->when($terms->isNotEmpty(), fn ($builder) => $this->matchEntryTerms($builder, $terms->all()))
             ->select(['id', 'title', 'created_at'])
             ->latest('created_at')
             ->orderByDesc('id')
             ->paginate(8);
 
         return response()->json(['entries' => $entries]);
+    }
+
+    /** @param array<int, string> $terms */
+    private function matchEntryTerms(Builder $builder, array $terms): void
+    {
+        foreach ($terms as $term) {
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                $builder->whereRaw(
+                    "translate(lower(title || ' ' || body), 'áéíóúüñ', 'aeiouun') like ?",
+                    ["%{$term}%"],
+                );
+
+                continue;
+            }
+
+            $builder->whereRaw("lower(title || ' ' || body) like ?", ["%{$term}%"]);
+        }
     }
 
     public function chunks(Request $request, OllamaClient $ollama): JsonResponse
@@ -38,7 +59,7 @@ class SearchController extends Controller
     {
         $validated = $request->validate([
             'q' => ['required', 'string', 'max:500'],
-            'chunk_ids' => ['required', 'array', 'min:1', 'max:8'],
+            'chunk_ids' => ['required', 'array', 'min:1', 'max:12'],
             'chunk_ids.*' => ['integer', 'distinct', 'exists:content_chunks,id'],
         ]);
         $chunkIds = $validated['chunk_ids'];
@@ -69,7 +90,7 @@ class SearchController extends Controller
                 ->select('content_chunks.*')
                 ->selectRaw('1 - (embedding <=> ?::vector) as similarity', [$vector])
                 ->orderByDesc('similarity'))
-            ->limit(8)
+            ->limit(12)
             ->get();
     }
 }
