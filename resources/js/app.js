@@ -26,10 +26,53 @@ marked.use({
 window.Alpine = Alpine;
 
 Alpine.data('embeddingApp', () => ({
-    query: '', entries: { data: [], current_page: 1, last_page: 1 }, chunks: [], summary: 'Escribe una consulta para recuperar fragmentos y generar un microresumen.', modalOpen: false, saving: false, loadingIndex: false, loadingChunks: false, loadingRag: false, entry: { id: null, title: '', body: '' }, searchController: null,
+    query: '', entries: { data: [], current_page: 1, last_page: 1 }, chunks: [], summary: 'Escribe una consulta para recuperar fragmentos y generar un microresumen.', modalOpen: false, saving: false, loadingIndex: false, loadingChunks: false, loadingRag: false, indexError: '', entry: { id: null, title: '', body: '' }, searchController: null,
     init() { this.search(); },
     async search() { this.searchController?.abort(); this.searchController = new AbortController(); await this.searchChunks(this.searchController.signal); },
-    async searchChunks(signal) { const query = this.query.trim(); this.chunks = []; this.entries = { data: [], current_page: 1, last_page: 1, total: 0 }; this.summary = query ? 'Recuperando y reordenando resultados híbridos…' : 'Escribe una consulta para recuperar fragmentos y generar un microresumen.'; if (!query) return; this.loadingIndex = true; this.loadingChunks = true; try { const response = await fetch(`/search/chunks?q=${encodeURIComponent(query)}`, { headers: { Accept: 'application/json' }, signal }); if (!response.ok) throw new Error(); const data = await response.json(); this.chunks = data.chunks; this.entries = { data: data.entries, current_page: 1, last_page: 1, total: data.entries.length }; await this.generateRag(query, this.chunks.map(chunk => chunk.id), signal); } catch (error) { if (error.name !== 'AbortError') this.summary = 'No fue posible recuperar fragmentos desde Ollama.'; } finally { this.loadingIndex = false; this.loadingChunks = false; } },
+    async searchChunks(signal) {
+        const query = this.query.trim();
+        this.chunks = [];
+        this.entries = { data: [], current_page: 1, last_page: 1, total: 0 };
+        this.indexError = '';
+        this.summary = query ? 'Recuperando y reordenando resultados híbridos…' : 'Escribe una consulta para recuperar fragmentos y generar un microresumen.';
+        this.loadingIndex = true;
+        this.loadingChunks = Boolean(query);
+
+        if (!query) {
+            try {
+                const response = await fetch('/content', { headers: { Accept: 'application/json' }, signal });
+                if (!response.ok) throw new Error();
+                const data = await response.json();
+                if (this.query.trim()) return;
+                this.entries = { data: data.entries, current_page: 1, last_page: 1, total: data.entries.length };
+            } catch (error) {
+                if (error.name !== 'AbortError') this.indexError = 'No fue posible cargar el índice de contenido.';
+            } finally {
+                if (this.searchController?.signal === signal) {
+                    this.loadingIndex = false;
+                    this.loadingChunks = false;
+                }
+            }
+
+            return;
+        }
+
+        try {
+            const response = await fetch(`/search/chunks?q=${encodeURIComponent(query)}`, { headers: { Accept: 'application/json' }, signal });
+            if (!response.ok) throw new Error();
+            const data = await response.json();
+            this.chunks = data.chunks;
+            this.entries = { data: data.entries, current_page: 1, last_page: 1, total: data.entries.length };
+            await this.generateRag(query, this.chunks.map(chunk => chunk.id), signal);
+        } catch (error) {
+            if (error.name !== 'AbortError') this.summary = 'No fue posible recuperar fragmentos desde Ollama.';
+        } finally {
+            if (this.searchController?.signal === signal) {
+                this.loadingIndex = false;
+                this.loadingChunks = false;
+            }
+        }
+    },
     async generateRag(query, chunkIds, signal) { if (!chunkIds.length) { this.summary = 'No se recuperaron fragmentos para generar una respuesta.'; return; } this.loadingRag = true; this.summary = 'Generando respuesta RAG…'; try { const response = await fetch('/search/rag', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content }, body: JSON.stringify({ q: query, chunk_ids: chunkIds }), signal }); if (!response.ok) throw new Error(); this.summary = (await response.json()).summary; } catch (error) { if (error.name !== 'AbortError') this.summary = 'No fue posible generar la respuesta RAG.'; } finally { this.loadingRag = false; } },
     newEntry() { this.entry = { id: null, title: '', body: '' }; this.modalOpen = true; },
     async openEntry(id) { const response = await fetch(`/content/${id}`, { headers: { Accept: 'application/json' } }); this.entry = (await response.json()).entry; this.modalOpen = true; },

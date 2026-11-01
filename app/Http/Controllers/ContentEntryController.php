@@ -14,6 +14,15 @@ use Illuminate\Support\Str;
 
 class ContentEntryController extends Controller
 {
+    public function index(): JsonResponse
+    {
+        return response()->json([
+            'entries' => ContentEntry::query()
+                ->latest()
+                ->get(['id', 'title', 'created_at']),
+        ]);
+    }
+
     public function show(ContentEntry $contentEntry): JsonResponse
     {
         return response()->json(['entry' => $contentEntry]);

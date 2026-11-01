@@ -26,8 +26,9 @@
             <section class="min-h-[580px] rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-2xl shadow-slate-950/30">
                 <div class="mb-5 flex items-center justify-between"><h2 class="font-semibold">Índice de contenido</h2><span class="rounded-full bg-slate-800 px-2 py-1 text-xs text-slate-400" x-text="entries.total || 0"></span></div>
                 <div class="space-y-2">
-                    <template x-for="entry in entries.data" :key="entry.id"><button @click="openEntry(entry.id)" class="w-full rounded-xl border border-transparent bg-slate-800/60 p-3 text-left transition hover:border-cyan-500/60 hover:bg-slate-800"><p class="truncate font-medium" x-text="entry.title"></p><p class="mt-1 text-xs text-slate-500" x-text="`${entry.matched_chunks} chunks · score ${Number(entry.relevance).toFixed(3)}`"></p></button></template>
-                    <p x-show="!entries.data.length" class="py-12 text-center text-sm text-slate-500">No hay contenido que mostrar.</p>
+                    <template x-for="entry in entries.data" :key="entry.id"><button @click="openEntry(entry.id)" class="w-full rounded-xl border border-transparent bg-slate-800/60 p-3 text-left transition hover:border-cyan-500/60 hover:bg-slate-800"><p class="truncate font-medium" x-text="entry.title"></p><p x-show="entry.matched_chunks === undefined" class="mt-1 text-xs text-slate-500">Disponible en el índice</p><p x-show="entry.matched_chunks !== undefined" class="mt-1 text-xs text-slate-500" x-text="`${entry.matched_chunks} chunks · score ${Number(entry.relevance).toFixed(3)}`"></p></button></template>
+                    <p x-show="indexError" class="py-12 text-center text-sm text-rose-400" x-text="indexError"></p>
+                    <p x-show="!entries.data.length && !indexError && !loadingIndex" class="py-12 text-center text-sm text-slate-500">No hay contenido que mostrar.</p>
                 </div>
             </section>
 
